@@ -18,17 +18,18 @@ namespace VolkovOrc.Controllers
     [ApiController]
     public class OcrController : ControllerBase
     {
-        private readonly TesseractEngine _ocrEngine;
-        private readonly PdfConverterBitMiracl _pdfConverter;
+        private TesseractEngine _ocrEngine;
+        private readonly PdfConverter _pdfConverter;
+        private string _currentLanguage = "rus";
 
         public OcrController()
         {
-            _ocrEngine = new TesseractEngine(@"./tessdata", "eng+rus", EngineMode.Default);
-            _pdfConverter = new PdfConverterBitMiracl();
+            _ocrEngine = new TesseractEngine(@"./tessdata", _currentLanguage, EngineMode.Default);
+            _pdfConverter = new PdfConverter();
         }
 
         [HttpPost("upload")]
-        public IActionResult Upload(IFormFile file)
+        public IActionResult Upload(IFormFile file, string language = "rus")
         {
             if (file == null || file.Length == 0)
                 return BadRequest("No file uploaded.");
@@ -45,14 +46,22 @@ namespace VolkovOrc.Controllers
                     file.CopyTo(stream);
                     stream.Position = 0; // Reset stream position before reading
 
+                    // Инициализация Tesseract с выбранным языком перед обработкой
+                    if (language != _currentLanguage)
+                    {
+                        _ocrEngine.Dispose();
+                        _ocrEngine = new TesseractEngine(@"./tessdata", language, EngineMode.Default);
+                        _currentLanguage = language;
+                    }
+
                     switch (fileExtension)
                     {
                         case ".pdf":
                             // Специальная обработка PDF
                             textPdf = _pdfConverter.ConverPdfToString(stream);
-                            if(textPdf != null)
+                            if (textPdf != null)
                             {
-                                break;
+                                return Ok(textPdf);
                             }
                             image = _pdfConverter.ConvertPdfToPix(stream);
                             break;
@@ -77,7 +86,6 @@ namespace VolkovOrc.Controllers
                             return BadRequest("Unsupported file type.");
                     }
 
-
                     if (image != null)
                     {
                         using (var page = _ocrEngine.Process(image))
@@ -86,8 +94,8 @@ namespace VolkovOrc.Controllers
                             return Ok(text);
                         }
                     }
-                    else { return Ok(textPdf); }
 
+                    return BadRequest("Image conversion failed.");
                 }
             }
             catch (Exception ex)

@@ -46,4 +46,28 @@ public class PdfConverter
         return null; // Возвращаем null, если изображений нет
     }
 
+    public String ConverPdfToString(Stream pdfStream)
+    {
+        StringBuilder documentText = new StringBuilder();
+        using (PdfDocument document = PdfDocument.Open(pdfStream))
+        {
+            foreach (UglyToad.PdfPig.Content.Page page in document.GetPages())
+            {
+                string pageText = page.Text;
+                documentText.AppendLine(pageText); // добавляю текст в стрингбилдер
+
+                foreach (Word word in page.GetWords())
+                {
+                    documentText.Append(word.Text + " ");
+                }
+                documentText.AppendLine(); // пвзделитель между страницами
+            }
+
+
+
+        }
+
+            return documentText.ToString();
+    }
+
 }
