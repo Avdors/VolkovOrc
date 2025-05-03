@@ -103,5 +103,43 @@ namespace VolkovOrc.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// API для загрузки PDF и разбиения его на отдельные страницы.
+        /// </summary>
+        [HttpPost("upload-and-split-pdf")]
+        public IActionResult UploadAndSplitPdf(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("No file uploaded.");
+
+            var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (fileExtension != ".pdf")
+                return BadRequest("Only PDF files are supported.");
+
+            try
+            {
+                using var stream = new MemoryStream();
+                file.CopyTo(stream);
+                stream.Position = 0;
+
+                List<byte[]> splitPages = _pdfConverter.SplitPdfPages(stream);
+                if (splitPages.Count == 0)
+                    return BadRequest("Failed to split PDF into pages.");
+
+                // Формируем JSON-ответ с динамическими ключами
+                var result = new Dictionary<string, string>();
+                for (int i = 0; i < splitPages.Count; i++)
+                {
+                    result[$"file{i + 1}"] = Convert.ToBase64String(splitPages[i]);
+                }
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = "Internal server error", message = ex.Message });
+            }
+        }
     }
 }
